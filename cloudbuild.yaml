@@ -1,0 +1,42 @@
+# In this directory, run the following command to build this builder.
+# $ gcloud builds submit
+
+steps:
+# Build all supported versions.
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build',
+         '--build-arg', 'DOCKER_PKG_VERSION=5:${_DOCKER_VERSION}~3-0~ubuntu-focal',
+         '--tag=gcr.io/$PROJECT_ID/docker:${_DOCKER_VERSION}',
+         '.']
+  id: 'build'
+
+- name: 'gcr.io/$PROJECT_ID/docker'
+  args: ['tag', 'gcr.io/$PROJECT_ID/docker:${_DOCKER_VERSION}', 'gcr.io/$PROJECT_ID/docker']
+  wait_for: ['build']
+  id: 'latest'
+
+- name: 'gcr.io/$PROJECT_ID/docker'
+  args: ['inspect', 'gcr.io/$PROJECT_ID/docker']
+  wait_for: ['latest']
+
+# Test: build itself
+- name: 'gcr.io/$PROJECT_ID/docker'
+  args:
+  - 'build'
+  - '.'
+  wait_for: ['latest']
+
+# Test: each version by using it to run "docker build" on itself.
+- name: 'gcr.io/$PROJECT_ID/docker'
+  args: ['run', 'busybox', 'echo', 'Hello, world!']
+  wait_for: ['latest']
+
+images:
+- 'gcr.io/$PROJECT_ID/docker:latest'
+- 'gcr.io/$PROJECT_ID/docker:${_DOCKER_VERSION}'
+
+substitutions:
+  _DOCKER_VERSION: 20.10.12
+
+options:
+  dynamic_substitutions: true
